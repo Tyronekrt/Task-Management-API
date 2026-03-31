@@ -1,58 +1,133 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+Laravel Task Management API - Assessment
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Overview
+--------
+This project is a Laravel-style implementation for the Task Management API assessment. It implements core task operations, business rules, feature tests, seeders, and a minimal development server for manual API testing.
 
-## About Laravel
+Requirements
+------------
+- PHP >= 8.0
+- Composer
+- MySQL
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
-
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
-
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
-
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+Quick Local Setup
+-----------------
+1. Copy the environment example and configure MySQL credentials:
 
 ```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+cp .env.example .env
+# edit .env to set DB_HOST, DB_DATABASE, DB_USERNAME, DB_PASSWORD
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+2. Install dependencies:
 
-## Contributing
+```bash
+composer install
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+3. Generate the application key, migrate and seed:
 
-## Code of Conduct
+```bash
+php artisan key:generate
+php artisan migrate
+php artisan db:seed --class=TaskSeeder
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+4. Run the feature tests:
 
-## Security Vulnerabilities
+```bash
+php artisan test
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+5. Start the local server and test the API:
 
-## License
+Use the Laravel built-in server if you have a full environment:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+```bash
+php artisan serve --host=127.0.0.1 --port=8000
+```
+
+Or use the provided minimal `server.php` for quick manual testing (SQLite-backed):
+
+```bash
+php -S 127.0.0.1:8001 server.php
+curl http://127.0.0.1:8001/api/tasks
+```
+
+Files of interest
+-----------------
+- `database/migrations/2026_03_30_000000_create_tasks_table.php` — creates `tasks` table and unique title+due_date index
+- `app/Models/Task.php` — Eloquent model and helper methods
+- `app/Http/Controllers/TaskController.php` — API methods
+- `app/Http/Requests/StoreTaskRequest.php` and `UpdateTaskRequest.php` — validation rules
+- `app/Http/Resources/TaskResource.php` — JSON representation
+- `database/seeders/TaskSeeder.php` and `database/factories/TaskFactory.php` — seed test data
+
+API Endpoints
+-------------
+
+1) Create Task
+- POST /api/tasks
+- Validation: `title` (required, unique per `due_date`), `priority` in `low|medium|high`, `due_date` today or later
+- Returns: 201 with created task
+
+2) List Tasks
+- GET /api/tasks
+- Behavior: sorted by priority (`high` -> `medium` -> `low`) then `due_date` ascending. Optional `status` query parameter to filter.
+- Returns: JSON list or an empty `data` array with a message if no tasks exist
+
+3) Update Task Status
+- PATCH /api/tasks/{id}/status
+- Validation: `status` must be one of `pending|in_progress|done`
+- Business rule: status can only progress (cannot revert). Invalid transitions return 422.
+
+4) Delete Task
+- DELETE /api/tasks/{id}
+- Business rule: only tasks with status `done` may be deleted. Other attempts return 403.
+
+5) Daily Report (bonus)
+- GET /api/tasks/report?date=YYYY-MM-DD
+- Returns counts per priority and status for the specified date.
+
+Example Requests
+----------------
+
+Create task
+```bash
+curl -X POST http://localhost:8000/api/tasks \\
+	-H "Content-Type: application/json" \\
+	-d '{"title":"Fix login bug","due_date":"2026-04-01","priority":"high"}'
+```
+
+List tasks
+```bash
+curl http://localhost:8000/api/tasks
+```
+
+Update status
+```bash
+curl -X PATCH http://localhost:8000/api/tasks/1/status \\
+	-H "Content-Type: application/json" \\
+	-d '{"status":"in_progress"}'
+```
+
+Delete task
+```bash
+curl -X DELETE http://localhost:8000/api/tasks/1
+```
+
+Daily report
+```bash
+curl http://localhost:8000/api/tasks/report?date=2026-03-30
+```
+
+Deployment Notes (short)
+------------------------
+Recommended hosts: Railway, Render, or any provider supporting PHP + MySQL.
+
+Basic steps:
+1. Push repo to GitHub and connect to the provider.
+2. Provision a MySQL database and add DB credentials to environment variables.
+3. Set `APP_ENV=production` and `APP_DEBUG=false`.
+4. Run migrations on the host: `php artisan migrate --force`.
+
